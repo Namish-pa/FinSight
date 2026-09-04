@@ -1,0 +1,21 @@
+[project]
+name = "finsight"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Namish-pa", email = "namish4005@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "faker>=40.38.0",
+    "pandas>=3.0.5",
+    "python-dotenv>=1.2.3",
+]
+
+[project.scripts]
+finsight = "finsight:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
