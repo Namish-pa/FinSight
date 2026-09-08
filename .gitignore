@@ -6,13 +6,15 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 *.egg-info/
 
 # Environment variables / secrets
 .env
 
-# Database (optional — see note below)
-# data/finsight.db
+# Database — generated file, rebuild locally with data/generate_data.py
+*.db
+data/finsight.db
 
 # OS/editor junk
 .DS_Store
