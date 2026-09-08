@@ -14,6 +14,7 @@ dependencies = [
     "pandas>=3.0.5",
     "pydantic>=2.13.5",
     "python-dotenv>=1.2.3",
+    "sqlparse>=0.6.0",
 ]
 
 [tool.uv]

@@ -42,3 +42,33 @@ def build_prompt(question: str) -> str:
         f"{RULES}\n\n"
         f"USER QUESTION: {question}"
     )
+
+
+def build_retry_prompt(question: str, failed_sql: str, error_message: str) -> str:
+    """
+    Assemble a follow-up prompt for the retry Gemini call after a failure.
+
+    Provides the full schema and rules as context, then gives the model the
+    original question, the SQL it previously generated, and the exact error
+    message so it can produce a corrected query.
+
+    Args:
+        question:      The original natural-language financial question.
+        failed_sql:    The SQL string that caused the error.
+        error_message: The exception message from the failed execution attempt.
+
+    Returns:
+        A formatted string ready to be used as the Gemini request content.
+    """
+    return (
+        f"SCHEMA:\n{SCHEMA_DESCRIPTION}\n\n"
+        f"{RULES}\n\n"
+        f"USER QUESTION: {question}\n\n"
+        f"PREVIOUS ATTEMPT:\n"
+        f"The SQL query you generated previously failed to execute.\n"
+        f"Failed SQL:\n{failed_sql}\n\n"
+        f"Error message:\n{error_message}\n\n"
+        f"Please analyse the error, correct the SQL, and return a valid JSON "
+        f"object with the fixed query. Remember: only single SELECT statements "
+        f"referencing the schema above are allowed."
+    )
