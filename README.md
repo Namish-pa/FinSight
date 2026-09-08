@@ -1,1 +1,263 @@
-ÿþ
+ÿþï»¿# FinSight
+
+> **Ask financial questions in plain English. Get SQL, data, and a concise answer instantly.**
+
+FinSight is an AI-powered financial query engine that converts natural-language questions into validated SQLite queries, executes them against a realistic synthetic finance database, and returns plain-English summaries. It uses a dual-LLM architecture: **Gemini 2.5 Flash** for precise SQL generation and **Groq** for lightning-fast result summarisation.
+
+---
+
+## Features
+
+- **Natural Language to SQL** - Ask questions like *"Which payment method is used most often?"* and get a valid, safe SELECT statement back
+- **Read-only by design** - Only `SELECT` statements are ever generated or executed; `INSERT`, `UPDATE`, `DELETE`, `DROP`, and `ALTER` are prohibited at the prompt level
+- **Dual-LLM pipeline** - Gemini for deep SQL reasoning, Groq for cheap, fast summarisation
+- **Pydantic-validated outputs** - Every LLM response is validated against a strict schema before it touches the database
+- **Realistic synthetic data** - 120 customers, 900 invoices, 10 accounts, and 1,200+ transactions generated with Faker (India-locale, reproducible seed)
+- **Modular architecture** - DB, LLM, and orchestration layers are cleanly separated and independently testable
+
+---
+
+## Architecture
+
+```
+User Question
+      |
+      v
+[ engine.py ]  <- orchestrates the full pipeline
+      |
+      |
+[ llm.py - generate_sql() ] -----> Gemini 2.5 Flash  (NL -> SQL + explanation)
+      |
+      | SQLResponse (validated by Pydantic)
+      |
+[ db.py - execute_sql(] -------> SQLite  (finsight.db)
+      |
+      | list[dict]  (raw rows)
+      |
+[ llm.py - summarize() ] --------> Groq  (rows -> plain-English answer)
+      |
+      v
+QueryResult  <-  question / sql / rows / summary
+```
+
+---
+
+## Project Structure
+
+```
+finsight/
+|-- data/
+|   |-- schema.sql          # SQLite DDL - 5 tables with FK + CHECK constraints
+|   |-- generate_data.py    # Synthetic data generator (Faker, reproducible seed)
+|   `-- finsight.db         # Pre-generated SQLite database (gitignored by default)
+|
+|-- query_engine/
+|   |-- __init__.py
+|   |-- engine.py           # Main pipeline: NL -> SQL -> DB -> summary
+|   |-- llm.py              # Gemini (SQL gen+ Groq (summarisation) clients
+|   |-- db.py               # SQLite execution layer
+|   |-- models.py           # Pydantic models: SQLResponse, QueryResult
+|   |-- prompts.py          # Prompt construction & behavioral RULES
+|   |-- schema.py           # Schema description injected into every prompt
+|   `-- test_manual.py      # Smoke-test script (6 questions, end-to-end)
+|
+|-- dashboard/              # (planned) Streamlit/web dashboard
+|-- forecasting/            # (planned) Time-series forecasting module
+|
+|-- .env.example            # Template for required API keys
+|-- pyproject.toml          # Project metadata & dependencies (uv)
+`-- requirements.txt        # Pip-compatible dependency list
+```
+
+---
+
+## Database Schema
+
+Five tables model a small B2B finance operation (amounts in INR):
+
+| Table | Rows (generated) | Description |
+|---|---|---|
+| `customers` | 120 | Contact, company, segment (SMB / Enterprise), city, credit limit |
+| `accounts` | 10 | Bank, cash, and credit accounts with current balance |
+| `invoices` | 900 | Per-customer invoices with status: paid, unpaid, overdue |
+| `payments` | ~495 | One payment record per paid invoice; supports 4 payment methods |
+| `transactions` | ~1,700 | All cash movements (inflows & outflows) linked to accounts |
+
+---
+
+## Setup
+
+### Prerequisites
+
+- Python 3.14+
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- A [Google AI Studio](https://aistudio.google.com/app/apikey) API key (Gemini)
+- A [Groq Console](https://console.groq.com/keysAPI key
+
+### 1 - Clone the repo
+
+```bash
+git clone https://github.com/Namish-pa/FinSight.git
+cd FinSight/finsight
+```
+
+### 2 - Install dependencies
+
+```bash
+# With uv (recommended)
+uv sync
+
+# Or with pip
+pip install -r requirements.txt
+```
+
+### 3 - Configure API keys
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and fill in your keys:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
+```
+
+### 4 - Generate the database
+
+```bash
+# With uv
+uv run python data/generate_data.py
+
+# Or directly
+python data/generate_data.py
+```
+
+This creates `data/finsight.db` with 120 customers, 900 invoices, and ~1,700 transactions.
+
+---
+
+## Usage
+
+### Run the end-to-end smoke test
+
+```bash
+uv run python -m query_engine.test_manual
+```
+
+Sample output:
+
+```
+FinSight Query Engine - Manual Test
+------------------------------------------------------------
+
+[1/6] Question: How many invoices are overdue?
+------------------------------------------------------------
+  SQL       : SELECT COUNT(*AS overdue_count FROM invoices WHERE status = 'overdue'
+  Rows      : 1 row(s) returned
+  Summary   : There are 387 overdue invoices.
+------------------------------------------------------------
+
+[2/6] Question: What's the total unpaid amount for Enterprise customers?
+------------------------------------------------------------
+  SQL       : SELECT SUM(i.amount) AS total_unpaid ...
+  Rows      : 1 row(sreturned
+  Summary   : The total unpaid amount for Enterprise customers is 12,345,678.90 INR.
+------------------------------------------------------------
+
+All tests completed.
+```
+
+### Use the Python API directly
+
+```python
+from query_engine.engine import ask
+
+result = ask("List the top 5 customers by outstanding balance")
+
+print(result.question  # Original question
+print(result.sql       # Generated SELECT statement
+print(result.rows)       # Raw list[dict] from SQLite
+print(result.summary   # 1-2 sentence plain-English answer
+```
+
+---
+
+## How It Works
+
+### Step 1 - SQL Generation (Gemini 2.5 Flash)
+
+`prompts.py` assembles a prompt containing:
+1. The full database **schema description** (table names, columns, types, value constraints)
+2. Strict **behavioral rules** (SELECT only, valid SQLite syntax, respond as JSON)
+3. The user's **natural-language question**
+
+Gemini returns a JSON object `{"sql": "...", "explanation": "..."}`, which is validated by the `SQLResponse` Pydantic model before anything touches the database.
+
+### Step 2 - Query Execution (SQLite)
+
+`db.py` executes the validated SELECT statement against `finsight.db` using Python's built-in `sqlite3` module. Rows are returned as `list[dict]` for easy serialisation downstream.
+
+### Step 3 - Summarisation (Groq)
+
+`llm.py::summarize()` sends the original question, the SQL, and up to 20 result rows to Groq. A lightweight model produces a concise 1-2 sentence plain-English answer grounded strictly in the returned data.
+
+---
+
+## Safety Design
+
+| Concern | Mitigation |
+|---|---|
+| Destructive SQL | Prompt rules prohibit anything other than SELECT; no write permissions enforced at application layer |
+| Hallucinated tables/columns | Schema is injected into every prompt; Gemini is instructed to only reference listed tables |
+| Malformed LLM output | Pydantic SQLResponse validates JSON shape; JSONDecodeError surfaces immediately |
+| Token limit blowout | Result rows are truncated to 20 before the summarisation prompt |
+| Key leakage | `.env` is gitignored; `.env.example` contains only placeholders |
+
+---
+
+## Example Questions
+
+| Question | What it tests |
+|---|---|
+| "How many invoices are overdue?" | Simple aggregation + status filter |
+| "What's the total unpaid amount for Enterprise customers?" | JOIN across customers + invoices |
+| "List the top 5 customers by outstanding balance" | ORDER BY + LIMIT + derived calculation |
+| "Which payment method is used most often?" | GROUP BY + COUNT on payments |
+| "What's our total cash balance across all accounts?" | Filter on account_type + SUM |
+| "How many customers are based in Mumbai?" | Simple WHERE + COUNT |
+
+---
+
+## Roadmap
+
+- [ ] **Streamlit dashboard** - interactive chat UI with query history and result tables
+- [ ] **Forecasting module** - time-series revenue and cash-flow predictions
+- [ ] **REST API** - FastAPI wrapper so the engine can be consumed by external services
+- [ ] **Automated test suite** - pytest with mocked LLM responses for CI
+- [ ] **PostgreSQL support** - swap SQLite backend for production-scale deployments
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes (`git commit -m 'Add my feature'`)
+4. Push to the branch (`git push origin feature/my-feature`)
+5. Open a Pull Request
+
+---
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+---
+
+## Author
+
+**Namish** - [@Namish-pa](https://github.com/Namish-pa)
+
+*Built as a portfolio project to demonstrate LLM-powered data querying with a clean, production-minded architecture.*
