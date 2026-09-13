@@ -28,6 +28,7 @@ Table: accounts
 - account_id (INTEGER, primary key)
 - account_name (TEXT)
 - account_type (TEXT) — one of: 'bank', 'cash', 'credit'
+- opening_balance (REAL)
 - balance (REAL)
 
 Table: transactions

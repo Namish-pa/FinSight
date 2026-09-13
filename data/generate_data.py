@@ -64,9 +64,10 @@ def gen_accounts(conn):
     for i in range(1, N_ACCOUNTS + 1):
         acc_type = random.choice(types)
         starting_balance = round(random.uniform(200_000, 5_000_000), 2)
-        rows.append((i, f"{fake.company()} - {acc_type.title()} A/C", acc_type, starting_balance))
+        # We insert starting_balance as both opening_balance and initial balance (to be updated later)
+        rows.append((i, f"{fake.company()} - {acc_type.title()} A/C", acc_type, starting_balance, starting_balance))
     conn.executemany(
-        "INSERT INTO accounts VALUES (?, ?, ?, ?)", rows
+        "INSERT INTO accounts VALUES (?, ?, ?, ?, ?)", rows
     )
     return rows
 
@@ -149,6 +150,35 @@ def gen_transactions(conn, accounts, invoices, payments):
     return rows
 
 
+def update_account_balances(conn):
+    cur = conn.cursor()
+    # Compute the net movement per account based on transactions
+    cur.execute("""
+        SELECT 
+            account_id,
+            SUM(CASE WHEN type = 'inflow' THEN amount ELSE 0 END) - 
+            SUM(CASE WHEN type = 'outflow' THEN amount ELSE 0 END) as net_movement
+        FROM transactions
+        GROUP BY account_id
+    """)
+    movements = cur.fetchall()
+
+    print("\n--- Account Balances Sanity Check ---")
+    for row in movements:
+        account_id, net_movement = row
+        # Get the opening balance
+        cur.execute("SELECT opening_balance FROM accounts WHERE account_id = ?", (account_id,))
+        opening_balance = cur.fetchone()[0]
+        
+        # Calculate new balance
+        new_balance = round(opening_balance + (net_movement or 0), 2)
+        
+        # Update the account record
+        cur.execute("UPDATE accounts SET balance = ? WHERE account_id = ?", (new_balance, account_id))
+        
+        print(f"Account {account_id:>2}: Opening = ${opening_balance:12,.2f} | Net Mvmt = ${net_movement:12,.2f} | Computed = ${new_balance:12,.2f}")
+    print("-------------------------------------\n")
+
 def main():
     if DB_PATH.exists():
         DB_PATH.unlink()
@@ -161,6 +191,8 @@ def main():
     invoices = gen_invoices(conn, customers)
     payments = gen_payments(conn, invoices)
     transactions = gen_transactions(conn, accounts, invoices, payments)
+
+    update_account_balances(conn)
 
     conn.commit()
 

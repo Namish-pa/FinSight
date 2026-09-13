@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     account_id      INTEGER PRIMARY KEY,
     account_name    TEXT NOT NULL,
     account_type    TEXT NOT NULL CHECK (account_type IN ('bank', 'cash', 'credit')),
+    opening_balance REAL NOT NULL,
     balance         REAL NOT NULL
 );
 

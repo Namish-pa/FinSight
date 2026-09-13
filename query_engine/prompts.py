@@ -21,6 +21,7 @@ RULES (follow these exactly):
      }
 4. The SQL must be valid SQLite syntax.
 5. Do not include any commentary, apologies, or text outside the JSON object.
+6. If a question asks for a financial metric that cannot be accurately computed from the available schema (e.g., profit margin, gross margin, net income — anything requiring a cost/revenue distinction not present in the tables), return a query that selects an error string, e.g.: SELECT 'Question cannot be answered with available data' AS error;
 """
 
 
