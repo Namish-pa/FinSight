@@ -1,123 +1,182 @@
 # FinSight
 
-**FinSight** is a Python‑based financial analytics platform designed to simplify data ingestion, forecasting, and interactive querying. It provides a modular architecture with a clear separation between data handling, forecasting models, and a dashboard UI.
+A financial analytics platform that combines a **deterministic KPI engine**, a **natural-language query interface**, and a **linear regression forecasting module** — all served through a FastAPI backend and a minimal React dashboard.
+
+Built as a portfolio project demonstrating a clean separation between AI-powered features and purely deterministic financial calculations.
 
 ---
 
-## Table of Contents
+## What It Does
 
-- [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Configuration](#configuration)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
-## Overview
-
-FinSight enables analysts and developers to quickly prototype financial data pipelines, generate forecasts using state‑of‑the‑art time‑series models, and explore results through an interactive dashboard. The codebase follows best practices for dependency management (using **uv**), type safety (via **pydantic**), and environment configuration (via **python‑dotenv**).
-
----
-
-## Features
-
-- **Modular design** – Separate packages for data ingestion (`data/`), forecasting (`forecasting/`), query handling (`query_engine/`) and visualization (`dashboard/`).
-- **Typed configuration** – Centralised settings powered by Pydantic for validation and auto‑completion.
-- **Extensible forecasting** – Plug‑in architecture allowing custom models.
-- **Interactive dashboard** – Built with modern web technologies (HTML, CSS, JavaScript) for a rich UI experience.
-- **Reproducible environment** – Dependency lockfile (`uv.lock`) ensures deterministic builds.
-
----
-
-## Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd finsight
-   ```
-2. **Set up a virtual environment** (optional but recommended)
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate   # On Windows
-   ```
-3. **Install dependencies**
-   ```bash
-   uv sync   # Uses the lockfile to install exact versions
-   ```
-4. **Configure environment variables**
-   - Copy `.env.example` to `.env` and fill in required values (e.g., API keys).
-
----
-
-## Quick Start
-
-```bash
-# Run the dashboard (development server)
-cd dashboard
-npm install   # Install front‑end dependencies
-npm run dev   # Starts the dev server at http://localhost:3000
-```
-
-For a quick data‑pipeline test:
-```bash
-python -m data.ingest   # Loads sample data into the local store
-python -m forecasting.run   # Generates forecasts
-python -m query_engine.run   # Starts the query interface
-```
+| Layer | What it computes | How |
+|---|---|---|
+| **KPI Engine** | DSO, AR Aging Buckets, Cash Runway, Monthly Cash Flow | Pure SQL + pandas, no LLM |
+| **Query Engine** | Answers plain-English questions about the data | Gemini → SQL → SQLite → Groq summary |
+| **Forecasting** | 3-month net cash flow projection | NumPy linear regression on complete months |
+| **API** | Exposes all of the above over HTTP | FastAPI |
+| **Dashboard** | Visualises everything in a minimal, monochrome UI | React + Vite + Recharts |
 
 ---
 
 ## Project Structure
 
 ```
-finSight/
-├── .env               # Environment variables (local)
-├── .env.example       # Example configuration file
-├── dashboard/         # Front‑end UI (HTML/CSS/JS)
-├── data/              # Data ingestion utilities
-├── forecasting/       # Forecasting models and pipelines
-├── query_engine/      # Query handling and API endpoints
-├── pyproject.toml     # Project metadata and dependencies
-├── requirements.txt   # Legacy requirements (for reference)
-├── uv.lock            # Locked dependency versions
-└── README.md          # This documentation
+finsight/
+├── client/                  # React + Vite frontend
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── KPIs.jsx         # DSO, Cash Runway, AR Aging table
+│   │   │   ├── Forecast.jsx     # Cash flow chart + projection
+│   │   │   └── QueryEngine.jsx  # Natural language query input
+│   │   ├── App.jsx
+│   │   ├── api.js               # fetch wrappers for the FastAPI backend
+│   │   └── index.css            # Monochrome e-reader design system
+│   ├── index.html
+│   └── package.json
+│
+└── server/                  # Python backend
+    ├── api/
+    │   ├── main.py              # FastAPI app (GET /kpis, GET /forecast, POST /ask)
+    │   └── test_api.py          # Manual smoke-test script
+    ├── data/
+    │   ├── schema.sql           # SQLite schema (accounts, transactions, invoices, clients)
+    │   └── generate_data.py     # Synthetic data generator; populates finsight.db
+    ├── kpi/
+    │   ├── db.py                # SQLite connection helper
+    │   └── metrics.py           # calculate_dso, calculate_aging_buckets,
+    │                            # calculate_cash_runway, calculate_monthly_cashflow
+    ├── forecasting/
+    │   └── models.py            # forecast_linear_regression (NumPy polyfit, deg=1)
+    ├── query_engine/
+    │   ├── engine.py            # ask(question) → QueryResult
+    │   ├── llm.py               # Gemini (SQL gen) + Groq (summarisation) clients
+    │   ├── prompts.py           # System prompt with schema context and safety rules
+    │   ├── db.py                # SQL execution against finsight.db
+    │   └── models.py            # QueryResult dataclass
+    ├── .env.example             # Required environment variable template
+    ├── pyproject.toml
+    └── uv.lock
 ```
 
 ---
 
-## Configuration
+## Prerequisites
 
-All configurable values are stored in the `.env` file. The project uses **python‑dotenv** to load these variables at runtime. Key variables include:
-- `API_KEY` – Authentication token for external data providers.
-- `DB_URL` – Connection string for the results database.
-- `LOG_LEVEL` – Logging verbosity (e.g., `INFO`, `DEBUG`).
-
-Refer to `.env.example` for a full list of supported keys.
+- **Python 3.11+** with [uv](https://github.com/astral-sh/uv) (`pip install uv`)
+- **Node.js 18+** with npm
 
 ---
 
-## Contributing
+## Setup
 
-Contributions are welcome! Please follow these steps:
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/your-feature`).
-3. Ensure code style compliance with `ruff` and type checking with `mypy`.
-4. Add or update tests as needed.
-5. Submit a pull request with a clear description of changes.
+### 1. Clone the repository
 
-For major changes, open an issue first to discuss the proposed modifications.
+```bash
+git clone <repository-url>
+cd finsight
+```
+
+### 2. Configure environment variables
+
+```bash
+cd server
+cp .env.example .env
+```
+
+Open `server/.env` and fill in your API keys:
+
+```env
+GEMINI_API_KEY=your_gemini_key_here   # https://aistudio.google.com/app/apikey
+GROQ_API_KEY=your_groq_key_here       # https://console.groq.com/keys
+```
+
+The KPI and forecasting modules are purely deterministic and **do not require any API keys**.
+
+### 3. Install backend dependencies
+
+```bash
+cd server
+uv sync
+```
+
+### 4. Generate the database
+
+```bash
+uv run python data/generate_data.py
+```
+
+This creates `server/data/finsight.db` with ~20 months of synthetic financial data (accounts, transactions, invoices, clients).
+
+### 5. Install frontend dependencies
+
+```bash
+cd ../client
+npm install
+```
+
+---
+
+## Running Locally
+
+You need two terminal sessions.
+
+**Terminal 1 — Backend (FastAPI)**
+```bash
+cd server
+uv run uvicorn api.main:app --reload --port 8000
+```
+
+**Terminal 2 — Frontend (Vite)**
+```bash
+cd client
+npm run dev
+```
+
+Open **http://localhost:5173** in your browser.
+
+---
+
+## API Endpoints
+
+All endpoints are served at `http://localhost:8000`.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/kpis` | Returns DSO, AR aging buckets, cash runway, and monthly cash flow |
+| `GET` | `/api/forecast` | Returns historical cash flow + 3-month linear regression forecast |
+| `POST` | `/api/ask` | Accepts `{"question": "..."}`, returns SQL, raw rows, and a natural-language summary |
+
+You can verify the backend independently with:
+```bash
+cd server
+uv run python api/test_api.py
+```
+
+---
+
+## Key Design Decisions
+
+**Strict module isolation.** The `kpi/` and `forecasting/` modules import nothing from `query_engine/`. Each layer has its own `db.py`. The `api/` layer is the only place they are composed together.
+
+**No hallucination for unavailable metrics.** The query engine's system prompt explicitly instructs the LLM to refuse questions that require financial concepts not present in the schema (e.g., profit margin, gross margin). It will not substitute a similar-sounding calculation.
+
+**Partial month exclusion in forecasting.** The linear regression fit automatically excludes the current/anchor month if it is incomplete, preventing a low-count partial month from distorting the trend slope.
+
+**Deterministic balance computation.** Account balances in the database are derived from `opening_balance + SUM(transactions)` rather than random static values, ensuring the cash runway KPI is consistent with actual transaction history.
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes (for query engine only) | Used for natural language → SQL generation |
+| `GROQ_API_KEY` | Yes (for query engine only) | Used for fast result summarisation |
+
+The KPI, forecasting, and data modules run entirely without API keys.
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License** – see the `LICENSE` file for details.
-
----
-
-
+MIT — see [`LICENSE`](LICENSE) for details.
