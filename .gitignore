@@ -1,29 +1,55 @@
-# Virtual environment
+# ── Python / Virtual environments ──────────────────────────────────────────
 .venv/
 venv/
-
-# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.egg-info/
 
-# Environment variables / secrets
+# ── Environment variables & secrets ────────────────────────────────────────
+# Never commit real keys. Copy .env.example → .env and fill in locally.
 .env
+server/.env
+**/.env
 
-# Database — generated file, rebuild locally with data/generate_data.py
+# ── Database ────────────────────────────────────────────────────────────────
+# Generated file — rebuild locally with: uv run python data/generate_data.py
 *.db
-data/finsight.db
+server/data/finsight.db
 
-# OS/editor junk
+# ── Frontend build output & dependencies ────────────────────────────────────
+client/node_modules/
+client/dist/
+client/dist-ssr/
+node_modules/
+dist/
+
+# ── Agent / IDE tooling directories ─────────────────────────────────────────
+# These contain machine-local context, session state, and generated content.
+.agent/
+.agents/
+.codex/
+.gemini/
+.impeccable/
+
+# ── OS / editor junk ────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# Streamlit
-.streamlit/secrets.toml
-
-# Logs
+# ── Logs ────────────────────────────────────────────────────────────────────
 *.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Streamlit ────────────────────────────────────────────────────────────────
+.streamlit/secrets.toml
