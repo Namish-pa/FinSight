@@ -6,15 +6,25 @@ Built as a portfolio project demonstrating a clean separation between AI-powered
 
 ---
 
+## Why This Project
+
+Built to mirror the kind of work done in financial analytics consulting: cash flow optimization, BI dashboarding, and — increasingly — AI-driven finance tooling. Three deliberate choices reflect that:
+
+- **A deterministic KPI layer sits alongside the AI layer, not instead of it.** DSO, AR aging, and cash runway are computed with plain SQL/pandas — never delegated to an LLM — because financial metrics that drive real decisions need to be exact and auditable, not "usually right." The LLM is reserved for what it's actually good at: flexible, ad-hoc natural-language questions.
+- **The system knows what it doesn't know.** Ask it something the schema can't support (e.g. "what's our profit margin?" — there's no cost/revenue split in this data) and it says so, rather than quietly substituting a similar-sounding calculation. That distinction came out of an actual bug caught during development — see Key Design Decisions below.
+- **Minimal, high-contrast dashboard design** — built to put the numbers first, with no visual noise competing for attention.
+
+---
+
 ## What It Does
 
-| Layer | What it computes | How |
-|---|---|---|
-| **KPI Engine** | DSO, AR Aging Buckets, Cash Runway, Monthly Cash Flow | Pure SQL + pandas, no LLM |
-| **Query Engine** | Answers plain-English questions about the data | Gemini → SQL → SQLite → Groq summary |
-| **Forecasting** | 3-month net cash flow projection | NumPy linear regression on complete months |
-| **API** | Exposes all of the above over HTTP | FastAPI |
-| **Dashboard** | Visualises everything in a minimal, monochrome UI | React + Vite + Recharts |
+| Layer            | What it computes                                      | How                                        |
+| ---------------- | ----------------------------------------------------- | ------------------------------------------ |
+| **KPI Engine**   | DSO, AR Aging Buckets, Cash Runway, Monthly Cash Flow | Pure SQL + pandas, no LLM                  |
+| **Query Engine** | Answers plain-English questions about the data        | Gemini → SQL → SQLite → Groq summary       |
+| **Forecasting**  | 3-month net cash flow projection                      | NumPy linear regression on complete months |
+| **API**          | Exposes all of the above over HTTP                    | FastAPI                                    |
+| **Dashboard**    | Visualises everything in a minimal, monochrome UI     | React + Vite + Recharts                    |
 
 ---
 
@@ -72,8 +82,8 @@ finsight/
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
-cd finsight
+git clone https://github.com/Namish-pa/FinSight.git
+cd FinSight
 ```
 
 ### 2. Configure environment variables
@@ -85,7 +95,7 @@ cp .env.example .env
 
 Open `server/.env` and fill in your API keys:
 
-```env
+```
 GEMINI_API_KEY=your_gemini_key_here   # https://aistudio.google.com/app/apikey
 GROQ_API_KEY=your_groq_key_here       # https://console.groq.com/keys
 ```
@@ -121,12 +131,14 @@ npm install
 You need two terminal sessions.
 
 **Terminal 1 — Backend (FastAPI)**
+
 ```bash
 cd server
 uv run uvicorn api.main:app --reload --port 8000
 ```
 
 **Terminal 2 — Frontend (Vite)**
+
 ```bash
 cd client
 npm run dev
@@ -140,13 +152,14 @@ Open **http://localhost:5173** in your browser.
 
 All endpoints are served at `http://localhost:8000`.
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/kpis` | Returns DSO, AR aging buckets, cash runway, and monthly cash flow |
-| `GET` | `/api/forecast` | Returns historical cash flow + 3-month linear regression forecast |
-| `POST` | `/api/ask` | Accepts `{"question": "..."}`, returns SQL, raw rows, and a natural-language summary |
+| Method | Path            | Description                                                                          |
+| ------ | --------------- | ------------------------------------------------------------------------------------ |
+| `GET`  | `/api/kpis`     | Returns DSO, AR aging buckets, cash runway, and monthly cash flow                    |
+| `GET`  | `/api/forecast` | Returns historical cash flow + 3-month linear regression forecast                    |
+| `POST` | `/api/ask`      | Accepts `{"question": "..."}`, returns SQL, raw rows, and a natural-language summary |
 
 You can verify the backend independently with:
+
 ```bash
 cd server
 uv run python api/test_api.py
@@ -164,14 +177,26 @@ uv run python api/test_api.py
 
 **Deterministic balance computation.** Account balances in the database are derived from `opening_balance + SUM(transactions)` rather than random static values, ensuring the cash runway KPI is consistent with actual transaction history.
 
+**SQL safety guard.** Every generated query is parsed with `sqlparse` before execution — only single, pure `SELECT` statements are allowed. This blocks both direct destructive requests and stacked-query injection attempts (e.g. `SELECT ...; DROP TABLE ...;`), independent of whether the LLM itself would have generated one.
+
+---
+
+## What I'd Do With More Time
+
+- **Schema-aware RAG for the query engine** — the current approach injects the full schema directly into every prompt, which works well at 5 tables but wouldn't scale past a few dozen; a real enterprise deployment would need retrieval to select only relevant tables per question.
+- **Row-level security** for multi-tenant access, so different users only see data they're authorized for.
+- **Swap SQLite for PostgreSQL** and add proper connection pooling for concurrent access.
+- **Embed the dashboard in Power BI** instead of a custom React frontend, to match how BI is typically delivered in enterprise finance teams.
+- **Add anomaly detection** on top of the monthly cash flow series — flagging months that deviate significantly from the forecasted trend, rather than just projecting forward.
+
 ---
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `GEMINI_API_KEY` | Yes (for query engine only) | Used for natural language → SQL generation |
-| `GROQ_API_KEY` | Yes (for query engine only) | Used for fast result summarisation |
+| Variable         | Required                     | Description                                |
+| ---------------- | ----------------------------- | ------------------------------------------ |
+| `GEMINI_API_KEY` | Yes (for query engine only)  | Used for natural language → SQL generation |
+| `GROQ_API_KEY`   | Yes (for query engine only)  | Used for fast result summarisation         |
 
 The KPI, forecasting, and data modules run entirely without API keys.
 
@@ -179,4 +204,4 @@ The KPI, forecasting, and data modules run entirely without API keys.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE) for details.
+MIT — see [`LICENSE`](https://github.com/Namish-pa/FinSight/blob/main/LICENSE) for details.
