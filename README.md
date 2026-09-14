@@ -180,17 +180,6 @@ uv run python api/test_api.py
 **SQL safety guard.** Every generated query is parsed with `sqlparse` before execution — only single, pure `SELECT` statements are allowed. This blocks both direct destructive requests and stacked-query injection attempts (e.g. `SELECT ...; DROP TABLE ...;`), independent of whether the LLM itself would have generated one.
 
 ---
-
-## What I'd Do With More Time
-
-- **Schema-aware RAG for the query engine** — the current approach injects the full schema directly into every prompt, which works well at 5 tables but wouldn't scale past a few dozen; a real enterprise deployment would need retrieval to select only relevant tables per question.
-- **Row-level security** for multi-tenant access, so different users only see data they're authorized for.
-- **Swap SQLite for PostgreSQL** and add proper connection pooling for concurrent access.
-- **Embed the dashboard in Power BI** instead of a custom React frontend, to match how BI is typically delivered in enterprise finance teams.
-- **Add anomaly detection** on top of the monthly cash flow series — flagging months that deviate significantly from the forecasted trend, rather than just projecting forward.
-
----
-
 ## Environment Variables
 
 | Variable         | Required                     | Description                                |
